@@ -43,11 +43,4 @@ Powered by:
 
 ---
 
-## 🛠️ Setup
 
-### 1. Clone and install
-
-```bash
-git clone https://github.com/your-repo/smart-laptop-finder.git
-cd smart-laptop-finder
-pip install -r requirements.txt
