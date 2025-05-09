@@ -27,6 +27,11 @@ query = st.text_input("Type your laptop need (e.g., Budget laptop for remote wor
 if query:
     st.write("🔎 Searching...")
     results = search_laptops(query)
+
+    if results is None:
+        st.error("❌ Sorry, we only support **laptop-related** queries right now.\n\nTry asking for something like:\n- Budget laptop for school\n- Lightweight laptop for travel\n- High performance notebook for gaming")
+        st.stop()
+
     st.success(f"Hi {st.session_state.user_name}, here are the top {len(results)} laptops:")
 
     selected = st.radio("🎯 Select one to get detailed comparison:", results["desc"].tolist(), index=0)
@@ -37,15 +42,13 @@ if query:
 
     if user_q:
         product_row = results[results["desc"] == selected].iloc[0]
-        answer = ask_laptop_question(product_row.to_string(), user_q, results)
+        answer = ask_laptop_question(product_row, user_q, results)
 
-        # Show latest answer
         st.info(answer)
 
-        # Save chat to memory
+        # Save chat
         st.session_state.chat_history.append((user_q, answer))
 
-    # Show previous chat history
     if st.session_state.chat_history:
         st.subheader("📜 Previous Q&A:")
         for i, (q, a) in enumerate(st.session_state.chat_history, 1):
@@ -56,4 +59,3 @@ if query:
     if selected:
         with open("user_log.csv", "a", encoding="utf-8") as f:
             f.write(f"{st.session_state.user_name},{query},{selected}\n")
-
