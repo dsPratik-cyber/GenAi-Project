@@ -25,8 +25,20 @@ supported_contexts = [
 ]
 context_vectors = model.encode(supported_contexts)
 
-# Relevance checker
+# Pre-compile regex patterns for faster matching
+patterns = {
+    'price_under': re.compile(r'under \u20b9?(\d+)'),
+    'price_above': re.compile(r'above \u20b9?(\d+)'),
+    'ram': re.compile(r'(\d+)\s*gb ram'),
+    'storage': re.compile(r'(\d+)(tb|gb) (ssd|hdd|storage)'),
+    'weight': re.compile(r'under (\d+(\.\d+)?)\s*kg')
+}
+
+# Relevance checker (modified for laptop-related queries only)
 def is_query_relevant(query, threshold=0.4):
+    query = query.lower()
+    if "laptop" not in query and not any(ctx in query for ctx in supported_contexts if ctx != "under" and ctx != "above"):
+        return False
     query_vec = model.encode([query])
     sims = cosine_similarity(query_vec, context_vectors)[0]
     return max(sims) > threshold
@@ -36,13 +48,13 @@ def extract_conditions(query):
     query = query.lower()
     conditions = {}
 
-    if match := re.search(r'under \u20b9?(\d+)', query):
+    if match := patterns['price_under'].search(query):
         conditions['max_price'] = int(match.group(1))
-    if match := re.search(r'above \u20b9?(\d+)', query):
+    if match := patterns['price_above'].search(query):
         conditions['min_price'] = int(match.group(1))
-    if match := re.search(r'(\d+)\s*gb ram', query):
+    if match := patterns['ram'].search(query):
         conditions['exact_ram'] = int(match.group(1))
-    if match := re.search(r'(\d+)(tb|gb) (ssd|hdd|storage)', query):
+    if match := patterns['storage'].search(query):
         size = int(match.group(1))
         if match.group(2) == 'tb':
             size *= 1024
@@ -53,7 +65,7 @@ def extract_conditions(query):
         conditions['cpu'] = "i5"
     elif "i7" in query:
         conditions['cpu'] = "i7"
-    if match := re.search(r'under (\d+(\.\d+)?)\s*kg', query):
+    if match := patterns['weight'].search(query):
         conditions['max_weight'] = float(match.group(1))
 
     return conditions
@@ -61,9 +73,9 @@ def extract_conditions(query):
 # Gemini LLM to extract structured filters from query
 def extract_conditions_from_llm(query):
     prompt = f"""
-You are a smart assistant that converts natural language queries into structured laptop filter conditions.
+You are a smart assistant that converts natural language queries into supported_contexts words with structured laptop filter conditions.
 User query: "{query}"
-Return a valid Python dictionary with any of the following keys if applicable:
+Return a query important words with valid Python dictionary with any of the following keys if applicable:
 - max_price
 - min_price
 - exact_ram
@@ -71,7 +83,7 @@ Return a valid Python dictionary with any of the following keys if applicable:
 - cpu (e.g., "i5")
 - max_weight
 
-Only return the dictionary. No extra text.
+return query important word add laptop then with the dictionary .
 """
     try:
         response = gemini_model.generate_content(prompt)
@@ -137,7 +149,7 @@ Laptops: {laptop_list}
 # Final search pipeline
 def search_laptops(query, k=15):
     if not is_query_relevant(query):
-        return None
+        return "This search engine is optimized for laptops only. Please try a query related to laptops."
 
     # Step 1: LLM + rule-based condition extraction
     llm_conditions = extract_conditions_from_llm(query)
@@ -151,11 +163,14 @@ def search_laptops(query, k=15):
 
     # Step 3: Semantic search on filtered subset
     query_vec = model.encode([query])
-    sub_index = faiss.IndexFlatL2(query_vec.shape[1])
-    sub_vectors = model.encode(prefiltered_df['Product_Name'].tolist())
-    sub_index.add(np.array(sub_vectors))
+    if not hasattr(search_laptops, "sub_index"):
+        # Load or create the FAISS index only once
+        sub_index = faiss.IndexFlatL2(query_vec.shape[1])
+        sub_vectors = model.encode(prefiltered_df['Product_Name'].tolist())
+        sub_index.add(np.array(sub_vectors))
+        search_laptops.sub_index = sub_index  # Cache FAISS index
 
-    _, sub_indices = sub_index.search(np.array(query_vec), min(k, len(prefiltered_df)))
+    _, sub_indices = search_laptops.sub_index.search(np.array(query_vec), min(k, len(prefiltered_df)))
     retrieved_df = prefiltered_df.iloc[sub_indices[0]]
 
     # Step 4: Final Gemini-based refinement
