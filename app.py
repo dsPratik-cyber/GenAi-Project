@@ -73,16 +73,15 @@ if query:
                 description = generate_laptop_description(selected)
                 st.markdown(f"**📝 AI-generated Description:** {description}")
 
-                # Display chat history
-                st.subheader("💬 Chat with the assistant:")
-                for i, (q, a) in enumerate(st.session_state.chat_history, 1):
-                    with st.chat_message("user"):
-                        st.markdown(q)
-                    with st.chat_message("assistant"):
-                        st.markdown(a)
+                # Display the chat history
+                if st.session_state.chat_history:
+                    st.subheader("📜 Previous Q&A:")
+                    for i, (q, a) in enumerate(st.session_state.chat_history, 1):
+                        with st.expander(f"Q{i}: {q}"):
+                            st.markdown(a)
 
                 # Chat input for user questions
-                user_q = st.chat_input("Ask a question about this laptop:")
+                user_q = st.text_input("Ask a question about this laptop:")
                 if user_q:
                     answer = ask_laptop_question(st.session_state.product_row, user_q, st.session_state.results)
                     st.session_state.chat_history.append((user_q, answer))
