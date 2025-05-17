@@ -7,7 +7,7 @@ load_dotenv()
 
 # Configure the Gemini API
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 def ask_laptop_question(product_info, user_question, all_laptops=None):
     """

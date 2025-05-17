@@ -149,7 +149,7 @@ Laptops: {laptop_list}
 # Final search pipeline
 def search_laptops(query, k=15):
     if not is_query_relevant(query):
-        return "This search engine is optimized for laptops only. Please try a query related to laptops."
+        return pd.DataFrame(columns=df.columns)
 
     # Step 1: LLM + rule-based condition extraction
     llm_conditions = extract_conditions_from_llm(query)
@@ -163,14 +163,10 @@ def search_laptops(query, k=15):
 
     # Step 3: Semantic search on filtered subset
     query_vec = model.encode([query])
-    if not hasattr(search_laptops, "sub_index"):
-        # Load or create the FAISS index only once
-        sub_index = faiss.IndexFlatL2(query_vec.shape[1])
-        sub_vectors = model.encode(prefiltered_df['Product_Name'].tolist())
-        sub_index.add(np.array(sub_vectors))
-        search_laptops.sub_index = sub_index  # Cache FAISS index
-
-    _, sub_indices = search_laptops.sub_index.search(np.array(query_vec), min(k, len(prefiltered_df)))
+    sub_index = faiss.IndexFlatL2(query_vec.shape[1])
+    sub_vectors = model.encode(prefiltered_df['Product_Name'].tolist())
+    sub_index.add(np.array(sub_vectors))
+    _, sub_indices = sub_index.search(np.array(query_vec), min(k, len(prefiltered_df)))
     retrieved_df = prefiltered_df.iloc[sub_indices[0]]
 
     # Step 4: Final Gemini-based refinement
